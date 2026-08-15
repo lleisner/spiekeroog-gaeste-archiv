@@ -1,5 +1,7 @@
 # Spiekerooger Gästestatistik-Archiv
 
+[![Archive guest statistics](https://github.com/lleisner/spiekeroog-gaeste-archiv/actions/workflows/archive.yml/badge.svg)](https://github.com/lleisner/spiekeroog-gaeste-archiv/actions/workflows/archive.yml)
+
 `collect_spiekeroog.py` ruft einmal täglich die [öffentlich sichtbare
 Gästestatistik](https://www.spiekeroog.de/buchung/file/codebehind/loadGaesteStatistik.php)
 der Nordseebad Spiekeroog GmbH ab und speichert sowohl die unveränderte
@@ -9,7 +11,30 @@ Das Projekt ist bewusst klein und benötigt außer Python keine zusätzlichen
 Pakete. Es ist ein unabhängiges Community-Projekt und nicht mit der
 Nordseebad Spiekeroog GmbH verbunden.
 
-## Installation auf macOS
+## Cloud-Archiv über GitHub Actions
+
+Das öffentliche Repository führt den Sammler in der GitHub-Cloud aus. Zwei
+versetzte Termine um 06:17 und 12:47 Uhr (`Europe/Berlin`) geben dem täglichen
+Lauf eine zweite Chance. Sobald an einem Kalendertag ein Snapshot vorliegt,
+beendet sich jeder weitere Lauf ohne erneuten Webabruf.
+
+Neue Daten werden direkt in `archive/` committed:
+
+- `archive/latest.csv`: pro Datum der zuletzt beobachtete Wert
+- `archive/snapshots.csv`: alle gespeicherten Abrufstände
+- `archive/raw/*.html`: unveränderte Antworten des öffentlichen Endpunkts
+
+Der Workflow lässt sich unter **Actions → Archive guest statistics → Run
+workflow** auch manuell starten. GitHub-Zeitpläne können sich verspäten oder in
+seltenen Lastspitzen ausfallen; die zwei Termine reduzieren dieses Risiko,
+sind aber keine formale Verfügbarkeitsgarantie.
+
+GitHub deaktiviert geplante Workflows in öffentlichen Repositories nach 60
+Tagen ohne Repository-Aktivität. Die täglichen Archiv-Commits halten das Repo
+im Normalbetrieb aktiv; trotzdem sollte der Actions-Status gelegentlich
+kontrolliert werden.
+
+## Optionale Installation auf macOS
 
 ```sh
 git clone https://github.com/lleisner/spiekeroog-gaeste-archiv.git
@@ -17,9 +42,10 @@ cd spiekeroog-gaeste-archiv
 ./install.sh
 ```
 
-Der Installer richtet einen persönlichen macOS-LaunchAgent ein. Er startet den
-Sammler täglich um 06:15 Uhr lokaler Zeit und einmal direkt nach der
-Installation. Repository- und Python-Pfad werden automatisch ermittelt.
+Der Installer richtet zusätzlich einen persönlichen macOS-LaunchAgent ein. Er
+startet den lokalen Sammler täglich um 06:15 Uhr und einmal direkt nach der
+Installation. Repository- und Python-Pfad werden automatisch ermittelt. Diese
+lokalen Daten bleiben unter `data/` und werden nicht ins Repository committed.
 
 ## Manuell ausführen
 
@@ -33,7 +59,8 @@ Nur Abruf und Formatprüfung, ohne Speicherung:
 /usr/bin/python3 collect_spiekeroog.py --dry-run
 ```
 
-Die Ergebnisse liegen unter `data/gaestestatistik/`:
+Bei manueller oder lokaler Ausführung liegen die Ergebnisse unter
+`data/gaestestatistik/`:
 
 - `latest.csv`: pro Datum genau der zuletzt beobachtete Wert
 - `snapshots.csv`: alle normalisierten Abrufstände
@@ -84,7 +111,13 @@ Agent wieder entfernen, ohne bereits gesammelte Daten zu löschen:
 
 ## Rücksichtsvoller Betrieb
 
-Die Standardinstallation erzeugt genau einen Abruf pro Tag. Bitte das Intervall
-nicht unnötig verkürzen. Der öffentliche Endpunkt kann sich jederzeit ändern;
-in diesem Fall beendet sich der Sammler mit einem Fehler, statt unbemerkt
-falsch formatierte Daten zu speichern.
+Cloud- und lokale Standardinstallation erzeugen jeweils höchstens einen Abruf
+pro Kalendertag. Bitte das Intervall nicht unnötig verkürzen. Der öffentliche
+Endpunkt kann sich jederzeit ändern; in diesem Fall beendet sich der Sammler
+mit einem Fehler, statt unbemerkt falsch formatierte Daten zu speichern.
+
+## Lizenz und Datenherkunft
+
+Der Programmcode steht unter der MIT-Lizenz. Die archivierten Zahlen stammen
+vom oben verlinkten öffentlichen Endpunkt; das Projekt beansprucht keine
+Urheberschaft an den Quelldaten.

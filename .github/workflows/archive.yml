@@ -1,0 +1,48 @@
+name: Archive guest statistics
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+      timezone: "Europe/Berlin"
+    - cron: "47 12 * * *"
+      timezone: "Europe/Berlin"
+  workflow_dispatch:
+
+concurrency:
+  group: spiekeroog-guest-archive
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Collect at most one snapshot per day
+        run: python collect_spiekeroog.py --data-dir archive --once-per-day
+
+      - name: Commit new archive data
+        run: |
+          git add -- archive
+          if git diff --cached --quiet; then
+            echo "No new archive data"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Archive guest statistics $(date -u +%F)"
+          git pull --rebase
+          git push

@@ -1,0 +1,2 @@
+# Raw responses are intentionally stored byte-for-byte, including source whitespace.
+archive/raw/** -whitespace linguist-generated=true

@@ -35,7 +35,11 @@ data_dir = repo_dir / "data" / "gaestestatistik"
 
 configuration = {
     "Label": "de.spiekeroog.gaestestatistik",
-    "ProgramArguments": [python_bin, str(repo_dir / "collect_spiekeroog.py")],
+    "ProgramArguments": [
+        python_bin,
+        str(repo_dir / "collect_spiekeroog.py"),
+        "--once-per-day",
+    ],
     "WorkingDirectory": str(repo_dir),
     "RunAtLoad": True,
     "StartCalendarInterval": {"Hour": 6, "Minute": 15},

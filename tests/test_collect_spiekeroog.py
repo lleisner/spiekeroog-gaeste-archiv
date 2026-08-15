@@ -4,7 +4,13 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from collect_spiekeroog import CSV_FIELDS, archive_snapshot, parse_guest_statistics
+from collect_spiekeroog import (
+    ARCHIVE_TIMEZONE,
+    CSV_FIELDS,
+    _already_collected_today,
+    archive_snapshot,
+    parse_guest_statistics,
+)
 
 
 SAMPLE_HTML = b"""
@@ -64,6 +70,16 @@ class GuestStatisticsTests(unittest.TestCase):
                 self.assertEqual(len(latest_rows), 2)
                 self.assertEqual(latest_rows[0]["gaeste_auf_insel"], "4492")
             self.assertEqual(len(list((data_dir / "raw").glob("*.html"))), 3)
+            self.assertTrue(
+                _already_collected_today(
+                    data_dir, datetime(2026, 8, 15, 23, 0, tzinfo=ARCHIVE_TIMEZONE)
+                )
+            )
+            self.assertFalse(
+                _already_collected_today(
+                    data_dir, datetime(2026, 8, 16, 6, 0, tzinfo=ARCHIVE_TIMEZONE)
+                )
+            )
 
 
 if __name__ == "__main__":

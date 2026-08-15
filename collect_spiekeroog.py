@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 from urllib.error import URLError
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 
 SOURCE_URL = (
@@ -22,6 +23,7 @@ SOURCE_URL = (
 )
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent / "data" / "gaestestatistik"
 MAX_RESPONSE_BYTES = 1_000_000
+ARCHIVE_TIMEZONE = ZoneInfo("Europe/Berlin")
 EXPECTED_HEADERS = (
     "Datum",
     "Geplante Anreisen",
@@ -168,6 +170,18 @@ def _read_existing_rows(csv_path: Path) -> List[Dict[str, str]]:
         return list(reader)
 
 
+def _already_collected_today(data_dir: Path, observed_at: datetime) -> bool:
+    rows = _read_existing_rows(data_dir / "snapshots.csv")
+    target_date = observed_at.astimezone(ARCHIVE_TIMEZONE).date()
+    return any(
+        datetime.fromisoformat(row["abgerufen_am"])
+        .astimezone(ARCHIVE_TIMEZONE)
+        .date()
+        == target_date
+        for row in rows
+    )
+
+
 def _atomic_write_csv(csv_path: Path, rows: List[Dict[str, str]]) -> None:
     descriptor, temporary_name = tempfile.mkstemp(
         dir=str(csv_path.parent), prefix=f".{csv_path.name}.", suffix=".tmp"
@@ -236,7 +250,7 @@ def archive_snapshot(
         _write_latest_csv(data_dir, existing_rows)
         return ArchiveResult(False, 0, digest, None)
 
-    observed_at = observed_at.astimezone().replace(microsecond=0)
+    observed_at = observed_at.astimezone(ARCHIVE_TIMEZONE).replace(microsecond=0)
     timestamp = observed_at.strftime("%Y%m%dT%H%M%S%z")
     raw_path = raw_dir / f"{timestamp}_{digest[:12]}.html"
     _atomic_write_bytes(raw_path, raw)
@@ -278,15 +292,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument(
         "--dry-run", action="store_true", help="Abrufen und prüfen, aber nicht speichern"
     )
+    parser.add_argument(
+        "--once-per-day",
+        action="store_true",
+        help="Ohne Abruf beenden, wenn heute bereits ein Snapshot gespeichert wurde",
+    )
     args = parser.parse_args(argv)
 
     try:
+        observed_at = datetime.now(ARCHIVE_TIMEZONE)
+        if args.once_per_day and _already_collected_today(args.data_dir, observed_at):
+            print(f"Heute bereits archiviert: {observed_at.date().isoformat()}")
+            return 0
         raw, html = fetch_source(args.timeout)
         rows = parse_guest_statistics(html)
         if args.dry_run:
             print(f"OK: {len(rows)} Zeilen geprüft; keine Dateien geschrieben")
             return 0
-        result = archive_snapshot(args.data_dir, raw, html, datetime.now().astimezone())
+        result = archive_snapshot(
+            args.data_dir, raw, html, datetime.now(ARCHIVE_TIMEZONE)
+        )
     except (OSError, UnicodeError, URLError, ValueError) as exc:
         print(f"Fehler: {exc}", file=sys.stderr)
         return 1
