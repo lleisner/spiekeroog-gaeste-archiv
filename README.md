@@ -11,6 +11,35 @@ Das Projekt ist bewusst klein und benötigt außer Python keine zusätzlichen
 Pakete. Es ist ein unabhängiges Community-Projekt und nicht mit der
 Nordseebad Spiekeroog GmbH verbunden.
 
+## Daten direkt ansehen und herunterladen
+
+Für die Nutzung des öffentlichen Archivs ist keine Installation erforderlich.
+Die CSV-Dateien werden bei jedem erfolgreichen Cloud-Lauf automatisch
+aktualisiert:
+
+| Datensatz | Inhalt | Ansicht auf GitHub | Direkter CSV-Zugriff |
+| --- | --- | --- | --- |
+| `latest.csv` | Pro Datum der zuletzt beobachtete Zahlenstand | [Interaktive Tabelle](archive/latest.csv) | [Rohdaten / Download](https://raw.githubusercontent.com/lleisner/spiekeroog-gaeste-archiv/main/archive/latest.csv) |
+| `snapshots.csv` | Alle täglichen Abrufe einschließlich späterer Revisionen | [Interaktive Tabelle](archive/snapshots.csv) | [Rohdaten / Download](https://raw.githubusercontent.com/lleisner/spiekeroog-gaeste-archiv/main/archive/snapshots.csv) |
+
+GitHub stellt CSV-Dateien bis zu einer Größe von 512 KB automatisch als
+durchsuchbare Tabelle dar. Auch wenn die vollständige `snapshots.csv` diese
+Grenze später überschreitet, bleibt der direkte CSV-Zugriff erhalten.
+
+Die kompakte Datei kann beispielsweise ohne lokalen Sammler direkt in ein
+Pandas-DataFrame geladen werden:
+
+```python
+import pandas as pd
+
+url = "https://raw.githubusercontent.com/lleisner/spiekeroog-gaeste-archiv/main/archive/latest.csv"
+df = pd.read_csv(url, parse_dates=["abgerufen_am", "datum"])
+```
+
+Die unveränderten Antworten des öffentlichen Endpunkts liegen zusätzlich im
+[Rohdatenverzeichnis](archive/raw/), sodass jeder normalisierte Zahlenstand
+nachvollzogen werden kann.
+
 ## Cloud-Archiv über GitHub Actions
 
 Das öffentliche Repository führt den Sammler in der GitHub-Cloud aus. Zwei
