@@ -3,12 +3,15 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from collect_spiekeroog import (
     ARCHIVE_TIMEZONE,
     CSV_FIELDS,
+    PUBLIC_CSV_FIELDS,
     _already_collected_today,
     archive_snapshot,
+    main,
     parse_guest_statistics,
 )
 
@@ -45,7 +48,11 @@ class GuestStatisticsTests(unittest.TestCase):
             changed_html = changed_raw.decode("utf-8")
 
             first = archive_snapshot(data_dir, SAMPLE_HTML, html, observed_at)
+            public_csv = data_dir / "gaestestatistik.csv"
+            self.assertTrue(public_csv.exists())
+            public_csv.unlink()
             second = archive_snapshot(data_dir, SAMPLE_HTML, html, observed_at)
+            self.assertTrue(public_csv.exists())
             changed = archive_snapshot(
                 data_dir, changed_raw, changed_html, observed_at + timedelta(minutes=1)
             )
@@ -69,6 +76,17 @@ class GuestStatisticsTests(unittest.TestCase):
                 latest_rows = list(csv.DictReader(handle))
                 self.assertEqual(len(latest_rows), 2)
                 self.assertEqual(latest_rows[0]["gaeste_auf_insel"], "4492")
+            with public_csv.open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                self.assertEqual(tuple(reader.fieldnames or ()), PUBLIC_CSV_FIELDS)
+                public_rows = list(reader)
+            self.assertEqual(
+                public_rows,
+                [
+                    {field: row[field] for field in PUBLIC_CSV_FIELDS}
+                    for row in latest_rows
+                ],
+            )
             self.assertEqual(len(list((data_dir / "raw").glob("*.html"))), 3)
             self.assertTrue(
                 _already_collected_today(
@@ -80,6 +98,31 @@ class GuestStatisticsTests(unittest.TestCase):
                     data_dir, datetime(2026, 8, 16, 6, 0, tzinfo=ARCHIVE_TIMEZONE)
                 )
             )
+
+    def test_once_per_day_rebuilds_missing_public_csv_without_fetching(self):
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            data_dir = Path(temporary_dir)
+            archive_snapshot(
+                data_dir,
+                SAMPLE_HTML,
+                SAMPLE_HTML.decode("utf-8"),
+                datetime(2026, 8, 15, 12, 0, tzinfo=timezone.utc),
+            )
+            public_csv = data_dir / "gaestestatistik.csv"
+            public_csv.unlink()
+
+            with patch(
+                "collect_spiekeroog._already_collected_today", return_value=True
+            ), patch("collect_spiekeroog.fetch_source") as fetch_source, patch(
+                "builtins.print"
+            ):
+                result = main(
+                    ["--data-dir", str(data_dir), "--once-per-day"]
+                )
+
+            self.assertEqual(result, 0)
+            fetch_source.assert_not_called()
+            self.assertTrue(public_csv.exists())
 
 
 if __name__ == "__main__":
