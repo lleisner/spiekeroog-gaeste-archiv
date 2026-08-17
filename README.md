@@ -11,6 +11,36 @@ Das Projekt ist bewusst klein und benötigt außer Python keine zusätzlichen
 Pakete. Es ist ein unabhängiges Community-Projekt und nicht mit der
 Nordseebad Spiekeroog GmbH verbunden.
 
+## Daten direkt ansehen und herunterladen
+
+Für die Nutzung des öffentlichen Archivs ist keine Installation erforderlich.
+Die CSV-Dateien werden bei jedem erfolgreichen Cloud-Lauf automatisch
+aktualisiert:
+
+| Datensatz | Inhalt | Ansicht auf GitHub | Direkter CSV-Zugriff |
+| --- | --- | --- | --- |
+| `gaestestatistik.csv` | Primärdatensatz mit genau den fünf Statistikspalten | [Interaktive Tabelle](archive/gaestestatistik.csv) | [Rohdaten / Download](https://raw.githubusercontent.com/lleisner/spiekeroog-gaeste-archiv/main/archive/gaestestatistik.csv) |
+| `latest.csv` | Neuester Zahlenstand pro Datum einschließlich Prüf- und Herkunftsfeldern | [Interaktive Tabelle](archive/latest.csv) | [Rohdaten / Download](https://raw.githubusercontent.com/lleisner/spiekeroog-gaeste-archiv/main/archive/latest.csv) |
+| `snapshots.csv` | Alle täglichen Abrufe einschließlich späterer Revisionen | [Interaktive Tabelle](archive/snapshots.csv) | [Rohdaten / Download](https://raw.githubusercontent.com/lleisner/spiekeroog-gaeste-archiv/main/archive/snapshots.csv) |
+
+GitHub stellt CSV-Dateien bis zu einer Größe von 512 KB automatisch als
+durchsuchbare Tabelle dar. Auch wenn die vollständige `snapshots.csv` diese
+Grenze später überschreitet, bleibt der direkte CSV-Zugriff erhalten.
+
+Der Primärdatensatz kann beispielsweise ohne lokalen Sammler direkt in ein
+Pandas-DataFrame geladen werden:
+
+```python
+import pandas as pd
+
+url = "https://raw.githubusercontent.com/lleisner/spiekeroog-gaeste-archiv/main/archive/gaestestatistik.csv"
+df = pd.read_csv(url, parse_dates=["datum"])
+```
+
+Die unveränderten Antworten des öffentlichen Endpunkts liegen zusätzlich im
+[Rohdatenverzeichnis](archive/raw/), sodass jeder normalisierte Zahlenstand
+nachvollzogen werden kann.
+
 ## Cloud-Archiv über GitHub Actions
 
 Das öffentliche Repository führt den Sammler in der GitHub-Cloud aus. Zwei
@@ -20,7 +50,8 @@ beendet sich jeder weitere Lauf ohne erneuten Webabruf.
 
 Neue Daten werden direkt in `archive/` committed:
 
-- `archive/latest.csv`: pro Datum der zuletzt beobachtete Wert
+- `archive/gaestestatistik.csv`: nutzerorientierte Ansicht mit fünf Spalten
+- `archive/latest.csv`: neuester Wert pro Datum mit Prüf- und Herkunftsfeldern
 - `archive/snapshots.csv`: alle gespeicherten Abrufstände
 - `archive/raw/*.html`: unveränderte Antworten des öffentlichen Endpunkts
 
@@ -62,7 +93,8 @@ Nur Abruf und Formatprüfung, ohne Speicherung:
 Bei manueller oder lokaler Ausführung liegen die Ergebnisse unter
 `data/gaestestatistik/`:
 
-- `latest.csv`: pro Datum genau der zuletzt beobachtete Wert
+- `gaestestatistik.csv`: nutzerorientierte Ansicht mit fünf Spalten
+- `latest.csv`: neuester Wert pro Datum mit Prüf- und Herkunftsfeldern
 - `snapshots.csv`: alle normalisierten Abrufstände
 - `raw/*.html`: unveränderte Antworten des öffentlichen Endpunkts
 - `collector.log` und `collector.error.log`: Ausgaben der täglichen Ausführung
@@ -74,12 +106,21 @@ Serverantwort wird nicht doppelt gespeichert.
 
 ## CSV-Spalten
 
-- `abgerufen_am`: Abrufzeit als ISO-8601-Zeitstempel mit Zeitzone
-- `datum`: Datum des Zahlenwertes
-- `geplante_anreisen`, `geplante_abreisen`, `geplante_tagesgaeste`
+`gaestestatistik.csv` enthält ausschließlich die Primärinformationen:
+
+- `datum`
+- `geplante_anreisen`
+- `geplante_abreisen`
+- `geplante_tagesgaeste`
 - `gaeste_auf_insel`
+
+`latest.csv` und `snapshots.csv` enthalten zusätzlich technische
+Provenienzfelder:
+
+- `abgerufen_am`: Abrufzeit als ISO-8601-Zeitstempel mit Zeitzone
 - `inhalt_sha256`: Prüfsumme der unveränderten HTML-Antwort
-- `quell_url` und `rohdatei`: Herkunft und lokaler Prüfpfad
+- `quell_url`: tatsächlich abgerufener öffentlicher Endpunkt
+- `rohdatei`: relativer Pfad zur gespeicherten HTML-Kopie in diesem Archiv
 
 ## Tägliche Ausführung auf macOS
 

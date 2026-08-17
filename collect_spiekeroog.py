@@ -42,6 +42,13 @@ CSV_FIELDS = (
     "quell_url",
     "rohdatei",
 )
+PUBLIC_CSV_FIELDS = (
+    "datum",
+    "geplante_anreisen",
+    "geplante_abreisen",
+    "geplante_tagesgaeste",
+    "gaeste_auf_insel",
+)
 
 
 @dataclass(frozen=True)
@@ -182,13 +189,17 @@ def _already_collected_today(data_dir: Path, observed_at: datetime) -> bool:
     )
 
 
-def _atomic_write_csv(csv_path: Path, rows: List[Dict[str, str]]) -> None:
+def _atomic_write_csv(
+    csv_path: Path,
+    rows: List[Dict[str, str]],
+    fieldnames: Sequence[str] = CSV_FIELDS,
+) -> None:
     descriptor, temporary_name = tempfile.mkstemp(
         dir=str(csv_path.parent), prefix=f".{csv_path.name}.", suffix=".tmp"
     )
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS, lineterminator="\n")
+            writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
             handle.flush()
@@ -202,7 +213,7 @@ def _atomic_write_csv(csv_path: Path, rows: List[Dict[str, str]]) -> None:
         raise
 
 
-def _write_latest_csv(data_dir: Path, rows: List[Dict[str, str]]) -> None:
+def _write_latest_exports(data_dir: Path, rows: List[Dict[str, str]]) -> None:
     latest_by_date: Dict[str, Dict[str, str]] = {}
     for row in rows:
         previous = latest_by_date.get(row["datum"])
@@ -215,6 +226,12 @@ def _write_latest_csv(data_dir: Path, rows: List[Dict[str, str]]) -> None:
             latest_by_date[row["datum"]] = row
     latest_rows = [latest_by_date[key] for key in sorted(latest_by_date)]
     _atomic_write_csv(data_dir / "latest.csv", latest_rows)
+    public_rows = [
+        {field: row[field] for field in PUBLIC_CSV_FIELDS} for row in latest_rows
+    ]
+    _atomic_write_csv(
+        data_dir / "gaestestatistik.csv", public_rows, PUBLIC_CSV_FIELDS
+    )
 
 
 def _atomic_write_bytes(path: Path, content: bytes) -> None:
@@ -247,7 +264,7 @@ def archive_snapshot(
     existing_rows = _read_existing_rows(csv_path)
 
     if existing_rows and existing_rows[-1]["inhalt_sha256"] == digest:
-        _write_latest_csv(data_dir, existing_rows)
+        _write_latest_exports(data_dir, existing_rows)
         return ArchiveResult(False, 0, digest, None)
 
     observed_at = observed_at.astimezone(ARCHIVE_TIMEZONE).replace(microsecond=0)
@@ -272,7 +289,7 @@ def archive_snapshot(
     ]
     all_rows = existing_rows + new_rows
     _atomic_write_csv(csv_path, all_rows)
-    _write_latest_csv(data_dir, all_rows)
+    _write_latest_exports(data_dir, all_rows)
     return ArchiveResult(True, len(new_rows), digest, raw_path)
 
 
@@ -302,6 +319,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         observed_at = datetime.now(ARCHIVE_TIMEZONE)
         if args.once_per_day and _already_collected_today(args.data_dir, observed_at):
+            existing_rows = _read_existing_rows(args.data_dir / "snapshots.csv")
+            _write_latest_exports(args.data_dir, existing_rows)
             print(f"Heute bereits archiviert: {observed_at.date().isoformat()}")
             return 0
         raw, html = fetch_source(args.timeout)
